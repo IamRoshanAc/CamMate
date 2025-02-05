@@ -1,13 +1,40 @@
 from rest_framework import status
+from django.http import StreamingHttpResponse
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from django.contrib.auth.models import User
 from api.models import BlacklistedToken
 from django.conf import settings
+from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAuthenticated
+import cv2
+
+
+RTSP_URL = "rtsp://admin:Dead_6533@192.168.1.64:554/Streaming/Channels/101"
+
+def generate_frames():
+    cap = cv2.VideoCapture(RTSP_URL)
+    while True:
+        success, frame = cap.read()
+        if not success:
+            break
+        else:
+            _, buffer = cv2.imencode('.jpg', frame)
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' +frame_bytes + b'\r\n' )
+            
+
+class VideoStreamAPIView(APIView):
+    def get(self, request, *args, **kwargs):
+        return StreamingHttpResponse(generate_frames(), content_type = 'multipart/x-mixed-replace; boundary = frame')
+
+
+@api_view(['GET'])
+def video_feed(request):
+    return StreamingHttpResponse(generate_frames(), content_type = 'multipart/x-mixed-replace; boundary = frame')
 
 class LoginAPIView(APIView):
     def post(self, request, *args, **kwargs):
